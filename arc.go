@@ -234,8 +234,25 @@ func (c *ARC) removeLRU(l *list.List) {
 	c.size--
 }
 
+func (c *ARC) replace(e *arcItem) {
+	var lru *arcItem
+	var target *list.List
+	if c.t1.Len() > 0 && (c.t1.Len() > c.split) || (e.parent == c.b2 && c.t1.Len() == c.split) {
+		lru = c.t1.Back().Value.(*arcItem)
+		target = c.b1
+	} else {
+		lru = c.t2.Back().Value.(*arcItem)
+		target = c.b2
+	}
 
+	if c.evictedFunc != nil {
+		defer c.evictedFunc(lru.key, lru.value)
+	}
 
+	lru.value = nil
+	lru.ghost = true
+	lru.setMRU(target)
+	c.size--
 }
 
 func (e *arcItem) setMRU(l *list.List) {
