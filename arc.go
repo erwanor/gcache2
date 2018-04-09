@@ -183,8 +183,26 @@ func (c *ARC) Len() int {
 	return c.size
 }
 
+func (c *ARC) request(e *arcItem) error {
+	var delta int
+	if e.parent == c.t1 || e.parent == c.t2 {
+		e.setMRU(c.t2)
+		return nil
+	}
 
+	// Note: I find this way of doing things really ugly. I am not happy with that.
+	// For now, we will stick to the specs but there is a refactor to be done here.
+	if e.parent == c.b1 {
+		if c.b1.Len() >= c.b2.Len() {
+			delta = 1
+		} else {
+			delta = c.b2.Len() / c.b1.Len()
 		}
+
+		c.split = minInt(c.split+delta, c.capacity)
+		c.replace(e)
+		e.setMRU(c.t2)
+		return nil
 	}
 
 	if e.parent == c.b2 {
