@@ -120,10 +120,8 @@ func (c *ARC) getWithLoader(key interface{}, isWait bool) (interface{}, error) {
 		if e != nil {
 			return nil, e
 		}
-		c.mu.Lock()
-		defer c.mu.Unlock()
 
-		_, err := c.set(key, v)
+		err := c.Set(key, v)
 		if err != nil {
 			return nil, err
 		}
@@ -140,9 +138,8 @@ func (c *ARC) getWithLoader(key interface{}, isWait bool) (interface{}, error) {
 
 func (c *ARC) Get(key interface{}) (interface{}, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	v, err := c.get(key, false)
+	c.mu.Unlock()
 	if err == KeyNotFoundError {
 		return c.getWithLoader(key, true)
 	}
