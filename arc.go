@@ -53,41 +53,81 @@ func (c *ARC) set(key, value interface{}) (interface{}, error) {
 		}
 	}
 
+	if c.addedFunc != nil {
+		defer c.addedFunc(key, value)
 	}
 
+	entry, exists := c.store[key]
+	if !exists {
+		c.size++
 
+		entry = &arcItem{
+			key:   key,
+			value: value,
 		}
 
+		c.request(entry)
+		c.store[key] = entry
+		return entry, nil
 	}
 
+	if entry.ghost {
+		c.size++
 	}
 
+	entry.value = value
+	entry.ghost = false
+	c.request(entry)
+	return entry, nil
 }
 
+func (c *ARC) Set(key, value interface{}) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, err := c.set(key, value)
+	return err
 }
 
+func (c *ARC) SetWithExpire(key, value interface{}, expiration time.Duration) error {
+	return c.Set(key, value)
 }
 
 func (c *ARC) get(key interface{}, onLoad bool) (interface{}, error) {
+	entry, exists := c.store[key]
+	if !exists {
+		// Ugly. This needs to go.
+		if !onLoad {
+			c.stats.IncrMissCount()
 		}
+		return nil, KeyNotFoundError
 	}
 
+	c.request(entry)
+
+	if c.deserializeFunc != nil {
+		return c.deserializeFunc(key, entry.value)
 	}
+
+	return entry.value, nil
 }
 
 func (c *ARC) getWithLoader(key interface{}, isWait bool) (interface{}, error) {
 	if c.loaderExpireFunc == nil {
 		return nil, KeyNotFoundError
 	}
+
 	value, _, err := c.load(key, func(v interface{}, expiration *time.Duration, e error) (interface{}, error) {
 		if e != nil {
 			return nil, e
 		}
 		c.mu.Lock()
 		defer c.mu.Unlock()
+
+		_, err := c.set(key, v)
 		if err != nil {
 			return nil, err
 		}
+
 		return v, nil
 	}, isWait)
 
@@ -98,21 +138,45 @@ func (c *ARC) getWithLoader(key interface{}, isWait bool) (interface{}, error) {
 	return value, nil
 }
 
+func (c *ARC) Get(key interface{}) (interface{}, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	v, err := c.get(key, false)
+	if err == KeyNotFoundError {
+		return c.getWithLoader(key, true)
+	}
+	return v, err
 }
 
+func (c *ARC) GetIFPresent(key interface{}) (interface{}, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
+	v, err := c.get(key, false)
+	if err == KeyNotFoundError {
+		return c.getWithLoader(key, false)
 	}
 
+	return v, err
 }
 
+func (c *ARC) GetALL() map[interface{}]interface{} {
+	m := make(map[interface{}]interface{})
+	return m
 }
 
 func (c *ARC) Keys() []interface{} {
+	return make([]interface{}, 0)
 }
 
+func (c *ARC) Purge() {
+	return
+}
+
+// Change bool to error
+func (c *ARC) Remove(key interface{}) bool {
+	return false
 }
 
 func (c *ARC) Len() int {
