@@ -205,6 +205,10 @@ func (c *ARC) Len() int {
 	return nil
 }
 
+func (c *ARC) removeLRU(l *list.List) {
+	lru := l.Back()
+	if c.evictedFunc != nil {
+		defer c.evictedFunc(lru.Value.(*arcItem).key, lru.Value.(*arcItem).value)
 	}
 
 	l.Remove(lru)
