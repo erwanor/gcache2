@@ -212,10 +212,33 @@ func (c *ARC) request(e *arcItem) error {
 			delta = c.b1.Len() / c.b2.Len()
 		}
 
+		c.split = maxInt(c.split-delta, 0)
+		c.replace(e)
+		e.setMRU(c.t2)
+		return nil
 	}
 
+	if e.parent != nil {
+		return errors.New("ARC/internal/request: unknown internal cache type")
+	}
 
+	l1Len := c.t1.Len() + c.b1.Len()
+	l2Len := c.t2.Len() + c.b2.Len()
 
+	if l1Len == c.capacity {
+		if c.t1.Len() < c.capacity {
+			c.removeLRU(c.b1)
+			c.replace(e)
+		} else {
+			c.removeLRU(c.t1)
+		}
+	} else {
+		if l1Len+l2Len >= c.capacity {
+			if l1Len+l2Len == 2*c.capacity {
+				c.removeLRU(c.b2)
+			}
+			c.replace(e)
+		}
 	}
 
 	e.setMRU(c.t1)
