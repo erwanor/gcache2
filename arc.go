@@ -216,4 +216,11 @@ func (c *ARC) Len() int {
 
 }
 
+func (e *arcItem) setMRU(l *list.List) {
+	if e.parent != nil {
+		e.parent.Remove(e.element)
+	}
+
+	e.parent = l
+	e.element = e.parent.PushFront(e)
 }
