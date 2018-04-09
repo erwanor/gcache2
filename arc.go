@@ -17,11 +17,29 @@ type arcItem struct {
 // Constantly balances between LRU and LFU, to improve the combined result.
 type ARC struct {
 	baseCache
+	store map[interface{}]*arcItem
+	// t1 ("tier-1") is an internal cache tracking "recency"
+	t1 *list.List
+	// t2 ("tier-2") is an internal cache tracking "frequency"
+	t2 *list.List
+	// Ghost lists for t1 and t2 respectively: tracks recently evicted keys.
+	b1 *list.List
+	b2 *list.List
+
+	// split is a tuning parameter used by the cache to optimize hit rate for
+	//      recency or frequency, depending on the workload.
+	//	It's sometime referred as the "learning parameter" of the cache.
+	split int
 }
 
 func newARC(cb *CacheBuilder) *ARC {
 	c := &ARC{}
 	buildCache(&c.baseCache, cb)
+	c.store = make(map[interface{}]*arcItem, c.capacity)
+	c.t1 = list.New()
+	c.t2 = list.New()
+	c.b1 = list.New()
+	c.b2 = list.New()
 	c.loadGroup.cache = c
 	return c
 }
