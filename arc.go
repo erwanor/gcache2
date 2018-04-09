@@ -6,6 +6,14 @@ import (
 	"time"
 )
 
+type arcItem struct {
+	key     interface{}
+	value   interface{}
+	parent  *list.List
+	element *list.Element
+	ghost   bool
+}
+
 // Constantly balances between LRU and LFU, to improve the combined result.
 type ARC struct {
 	baseCache
