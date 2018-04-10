@@ -158,13 +158,44 @@ func (c *ARC) GetIFPresent(key interface{}) (interface{}, error) {
 	return v, err
 }
 
+func (c *ARC) cached() []interface{} {
+	cached := make([]interface{}, 0)
+
+	for e := c.t1.Front(); e != nil; e = e.Next() {
+		cached = append(cached, e.Value.(*arcItem))
+	}
+
+	for e := c.t2.Front(); e != nil; e = e.Next() {
+		cached = append(cached, e.Value.(*arcItem))
+	}
+
+	return cached
+}
+
 func (c *ARC) GetALL() map[interface{}]interface{} {
-	m := make(map[interface{}]interface{})
-	return m
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	storeActual := make(map[interface{}]interface{})
+
+	cached := c.cached()
+	for _, elt := range cached {
+		storeActual[elt.(*arcItem).key] = elt.(*arcItem).value
+	}
+
+	return storeActual
 }
 
 func (c *ARC) Keys() []interface{} {
-	return make([]interface{}, 0)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cached := c.cached()
+	keys := make([]interface{}, 0)
+
+	for _, elt := range cached {
+		keys = append(keys, elt.(*arcItem).key)
+	}
+	return keys
 }
 
 func (c *ARC) Purge() {
