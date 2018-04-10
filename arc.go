@@ -183,6 +183,7 @@ func (c *ARC) Len() int {
 func (c *ARC) request(e *arcItem) error {
 	var delta int
 	if e.parent == c.t1 || e.parent == c.t2 {
+		c.stats.IncrHitCount()
 		e.setMRU(c.t2)
 		return nil
 	}
