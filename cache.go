@@ -60,7 +60,7 @@ type (
 type CacheBuilder struct {
 	clock            Clock
 	tp               string
-	size             int
+	capacity         int
 	loaderExpireFunc LoaderExpireFunc
 	evictedFunc      EvictedFunc
 	purgeVisitorFunc PurgeVisitorFunc
@@ -70,11 +70,11 @@ type CacheBuilder struct {
 	serializeFunc    SerializeFunc
 }
 
-func New(size int) *CacheBuilder {
+func New(capacity int) *CacheBuilder {
 	return &CacheBuilder{
-		clock: NewRealClock(),
-		tp:    TYPE_SIMPLE,
-		size:  size,
+		clock:    NewRealClock(),
+		tp:       TYPE_SIMPLE,
+		capacity: capacity,
 	}
 }
 
@@ -153,8 +153,8 @@ func (cb *CacheBuilder) Expiration(expiration time.Duration) *CacheBuilder {
 }
 
 func (cb *CacheBuilder) Build() Cache {
-	if cb.size <= 0 && cb.tp != TYPE_SIMPLE {
-		panic("gcache: Cache size <= 0")
+	if cb.capacity <= 0 && cb.tp != TYPE_SIMPLE {
+		panic("gcache: Cache capacity <= 0")
 	}
 
 	return cb.build()
@@ -177,7 +177,7 @@ func (cb *CacheBuilder) build() Cache {
 
 func buildCache(c *baseCache, cb *CacheBuilder) {
 	c.clock = cb.clock
-	c.size = cb.size
+	c.capacity = cb.capacity
 	c.loaderExpireFunc = cb.loaderExpireFunc
 	c.expiration = cb.expiration
 	c.addedFunc = cb.addedFunc
