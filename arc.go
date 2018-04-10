@@ -202,9 +202,22 @@ func (c *ARC) Purge() {
 	return
 }
 
-// Change bool to error
 func (c *ARC) Remove(key interface{}) bool {
-	return false
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	elt, exists := c.store[key]
+	if !exists {
+		return false
+	}
+
+	if elt.parent != nil {
+		elt.parent.Remove(elt.element)
+	}
+
+	delete(c.store, elt.key)
+	c.size--
+	return true
 }
 
 func (c *ARC) Len() int {
