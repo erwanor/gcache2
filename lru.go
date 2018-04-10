@@ -23,7 +23,7 @@ func newLRUCache(cb *CacheBuilder) *LRUCache {
 
 func (c *LRUCache) init() {
 	c.evictList = list.New()
-	c.items = make(map[interface{}]*list.Element, c.size+1)
+	c.items = make(map[interface{}]*list.Element, c.capacity+1)
 }
 
 func (c *LRUCache) set(key, value interface{}) (interface{}, error) {
@@ -42,8 +42,8 @@ func (c *LRUCache) set(key, value interface{}) (interface{}, error) {
 		item = it.Value.(*lruItem)
 		item.value = value
 	} else {
-		// Verify size not exceeded
-		if c.evictList.Len() >= c.size {
+		// Verify capacity not exceeded
+		if c.evictList.Len() >= c.capacity {
 			c.evict(1)
 		}
 		item = &lruItem{
