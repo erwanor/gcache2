@@ -23,7 +23,7 @@ func newLFUCache(cb *CacheBuilder) *LFUCache {
 
 func (c *LFUCache) init() {
 	c.freqList = list.New()
-	c.items = make(map[interface{}]*lfuItem, c.size+1)
+	c.items = make(map[interface{}]*lfuItem, c.capacity+1)
 	c.freqList.PushFront(&freqEntry{
 		freq:  0,
 		items: make(map[*lfuItem]struct{}),
@@ -66,8 +66,8 @@ func (c *LFUCache) set(key, value interface{}) (interface{}, error) {
 	if ok {
 		item.value = value
 	} else {
-		// Verify size not exceeded
-		if len(c.items) >= c.size {
+		// Verify capacity not exceeded
+		if len(c.items) >= c.capacity {
 			c.evict(1)
 		}
 		item = &lfuItem{
