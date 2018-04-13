@@ -5,11 +5,18 @@ import (
 	"time"
 )
 
-// Discards the least recently used items first.
+// Discards the least recently used store first.
 type LRUCache struct {
 	baseCache
-	items     map[interface{}]*list.Element
+	store     map[interface{}]*list.Element
 	evictList *list.List
+}
+
+type lruItem struct {
+	clock      Clock
+	key        interface{}
+	value      interface{}
+	expiration *time.Time
 }
 
 func newLRUCache(cb *CacheBuilder) *LRUCache {
@@ -23,7 +30,7 @@ func newLRUCache(cb *CacheBuilder) *LRUCache {
 
 func (c *LRUCache) init() {
 	c.evictList = list.New()
-	c.items = make(map[interface{}]*list.Element, c.capacity+1)
+	c.store = make(map[interface{}]*list.Element, c.capacity+1)
 }
 
 func (c *LRUCache) set(key, value interface{}) (interface{}, error) {
@@ -37,7 +44,7 @@ func (c *LRUCache) set(key, value interface{}) (interface{}, error) {
 
 	// Check for existing item
 	var item *lruItem
-	if it, ok := c.items[key]; ok {
+	if it, ok := c.store[key]; ok {
 		c.evictList.MoveToFront(it)
 		item = it.Value.(*lruItem)
 		item.value = value
@@ -51,7 +58,7 @@ func (c *LRUCache) set(key, value interface{}) (interface{}, error) {
 			key:   key,
 			value: value,
 		}
-		c.items[key] = c.evictList.PushFront(item)
+		c.store[key] = c.evictList.PushFront(item)
 	}
 
 	if c.expiration != nil {
@@ -123,7 +130,7 @@ func (c *LRUCache) get(key interface{}, onLoad bool) (interface{}, error) {
 
 func (c *LRUCache) getValue(key interface{}, onLoad bool) (interface{}, error) {
 	c.mu.Lock()
-	item, ok := c.items[key]
+	item, ok := c.store[key]
 	if ok {
 		it := item.Value.(*lruItem)
 		if !it.IsExpired(nil) {
@@ -191,7 +198,7 @@ func (c *LRUCache) Remove(key interface{}) bool {
 }
 
 func (c *LRUCache) remove(key interface{}) bool {
-	if ent, ok := c.items[key]; ok {
+	if ent, ok := c.store[key]; ok {
 		c.removeElement(ent)
 		return true
 	}
@@ -201,7 +208,7 @@ func (c *LRUCache) remove(key interface{}) bool {
 func (c *LRUCache) removeElement(e *list.Element) {
 	c.evictList.Remove(e)
 	entry := e.Value.(*lruItem)
-	delete(c.items, entry.key)
+	delete(c.store, entry.key)
 	if c.evictedFunc != nil {
 		entry := e.Value.(*lruItem)
 		c.evictedFunc(entry.key, entry.value)
@@ -211,9 +218,9 @@ func (c *LRUCache) removeElement(e *list.Element) {
 func (c *LRUCache) keys() []interface{} {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	keys := make([]interface{}, len(c.items))
+	keys := make([]interface{}, len(c.store))
 	var i = 0
-	for k := range c.items {
+	for k := range c.store {
 		keys[i] = k
 		i++
 	}
@@ -244,9 +251,9 @@ func (c *LRUCache) GetALL() map[interface{}]interface{} {
 	return m
 }
 
-// Returns the number of items in the cache.
+// Returns the number of store in the cache.
 func (c *LRUCache) Len() int {
-	return len(c.GetALL())
+	return len(c.store)
 }
 
 // Completely clear the cache
@@ -255,7 +262,7 @@ func (c *LRUCache) Purge() {
 	defer c.mu.Unlock()
 
 	if c.purgeVisitorFunc != nil {
-		for key, item := range c.items {
+		for key, item := range c.store {
 			it := item.Value.(*lruItem)
 			v := it.value
 			c.purgeVisitorFunc(key, v)
@@ -263,13 +270,6 @@ func (c *LRUCache) Purge() {
 	}
 
 	c.init()
-}
-
-type lruItem struct {
-	clock      Clock
-	key        interface{}
-	value      interface{}
-	expiration *time.Time
 }
 
 // returns boolean value whether this item is expired or not.
