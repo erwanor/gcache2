@@ -5,11 +5,24 @@ import (
 	"time"
 )
 
-// Discards the least frequently used items first.
+// Discards the least frequently used store first.
 type LFUCache struct {
 	baseCache
-	items    map[interface{}]*lfuItem
+	store    map[interface{}]*lfuItem
 	freqList *list.List // list for freqEntry
+}
+
+type freqEntry struct {
+	freq  uint
+	items map[*lfuItem]struct{}
+}
+
+type lfuItem struct {
+	clock       Clock
+	key         interface{}
+	value       interface{}
+	freqElement *list.Element
+	expiration  *time.Time
 }
 
 func newLFUCache(cb *CacheBuilder) *LFUCache {
@@ -23,7 +36,7 @@ func newLFUCache(cb *CacheBuilder) *LFUCache {
 
 func (c *LFUCache) init() {
 	c.freqList = list.New()
-	c.items = make(map[interface{}]*lfuItem, c.capacity+1)
+	c.store = make(map[interface{}]*lfuItem, c.capacity+1)
 	c.freqList.PushFront(&freqEntry{
 		freq:  0,
 		items: make(map[*lfuItem]struct{}),
@@ -62,12 +75,12 @@ func (c *LFUCache) set(key, value interface{}) (interface{}, error) {
 	}
 
 	// Check for existing item
-	item, ok := c.items[key]
+	item, ok := c.store[key]
 	if ok {
 		item.value = value
 	} else {
 		// Verify capacity not exceeded
-		if len(c.items) >= c.capacity {
+		if len(c.store) >= c.capacity {
 			c.evict(1)
 		}
 		item = &lfuItem{
@@ -81,7 +94,7 @@ func (c *LFUCache) set(key, value interface{}) (interface{}, error) {
 		fe.items[item] = struct{}{}
 
 		item.freqElement = el
-		c.items[key] = item
+		c.store[key] = item
 	}
 
 	if c.expiration != nil {
@@ -131,7 +144,7 @@ func (c *LFUCache) get(key interface{}, onLoad bool) (interface{}, error) {
 
 func (c *LFUCache) getValue(key interface{}, onLoad bool) (interface{}, error) {
 	c.mu.Lock()
-	item, ok := c.items[key]
+	item, ok := c.store[key]
 	if ok {
 		if !item.IsExpired(nil) {
 			c.increment(item)
@@ -222,7 +235,7 @@ func (c *LFUCache) Remove(key interface{}) bool {
 }
 
 func (c *LFUCache) remove(key interface{}) bool {
-	if item, ok := c.items[key]; ok {
+	if item, ok := c.store[key]; ok {
 		c.removeItem(item)
 		return true
 	}
@@ -231,7 +244,7 @@ func (c *LFUCache) remove(key interface{}) bool {
 
 // removeElement is used to remove a given list element from the cache
 func (c *LFUCache) removeItem(item *lfuItem) {
-	delete(c.items, item.key)
+	delete(c.store, item.key)
 	delete(item.freqElement.Value.(*freqEntry).items, item)
 	if c.evictedFunc != nil {
 		c.evictedFunc(item.key, item.value)
@@ -241,9 +254,9 @@ func (c *LFUCache) removeItem(item *lfuItem) {
 func (c *LFUCache) keys() []interface{} {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	keys := make([]interface{}, len(c.items))
+	keys := make([]interface{}, len(c.store))
 	var i = 0
-	for k := range c.items {
+	for k := range c.store {
 		keys[i] = k
 		i++
 	}
@@ -274,9 +287,9 @@ func (c *LFUCache) GetALL() map[interface{}]interface{} {
 	return m
 }
 
-// Returns the number of items in the cache.
+// Returns the number of store in the cache.
 func (c *LFUCache) Len() int {
-	return len(c.GetALL())
+	return len(c.store)
 }
 
 // Completely clear the cache
@@ -285,25 +298,12 @@ func (c *LFUCache) Purge() {
 	defer c.mu.Unlock()
 
 	if c.purgeVisitorFunc != nil {
-		for key, item := range c.items {
+		for key, item := range c.store {
 			c.purgeVisitorFunc(key, item.value)
 		}
 	}
 
 	c.init()
-}
-
-type freqEntry struct {
-	freq  uint
-	items map[*lfuItem]struct{}
-}
-
-type lfuItem struct {
-	clock       Clock
-	key         interface{}
-	value       interface{}
-	freqElement *list.Element
-	expiration  *time.Time
 }
 
 // returns boolean value whether this item is expired or not.
