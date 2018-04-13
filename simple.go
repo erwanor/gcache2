@@ -5,7 +5,7 @@ import "time"
 // SimpleCache has no clear priority for evict cache. It depends on key-value map order.
 type SimpleCache struct {
 	baseCache
-	items map[interface{}]*simpleItem
+	store map[interface{}]*simpleItem
 }
 
 func newSimpleCache(cb *CacheBuilder) *SimpleCache {
@@ -19,9 +19,9 @@ func newSimpleCache(cb *CacheBuilder) *SimpleCache {
 
 func (c *SimpleCache) init() {
 	if c.size <= 0 {
-		c.items = make(map[interface{}]*simpleItem)
+		c.store = make(map[interface{}]*simpleItem)
 	} else {
-		c.items = make(map[interface{}]*simpleItem, c.size)
+		c.store = make(map[interface{}]*simpleItem, c.size)
 	}
 }
 
@@ -57,19 +57,19 @@ func (c *SimpleCache) set(key, value interface{}) (interface{}, error) {
 	}
 
 	// Check for existing item
-	item, ok := c.items[key]
+	item, ok := c.store[key]
 	if ok {
 		item.value = value
 	} else {
 		// Verify size not exceeded
-		if (len(c.items) >= c.size) && c.size > 0 {
+		if (len(c.store) >= c.size) && c.size > 0 {
 			c.evict(1)
 		}
 		item = &simpleItem{
 			clock: c.clock,
 			value: value,
 		}
-		c.items[key] = item
+		c.store[key] = item
 	}
 
 	if c.expiration != nil {
@@ -119,7 +119,7 @@ func (c *SimpleCache) get(key interface{}, onLoad bool) (interface{}, error) {
 
 func (c *SimpleCache) getValue(key interface{}, onLoad bool) (interface{}, error) {
 	c.mu.Lock()
-	item, ok := c.items[key]
+	item, ok := c.store[key]
 	if ok {
 		if !item.IsExpired(nil) {
 			v := item.value
@@ -167,7 +167,7 @@ func (c *SimpleCache) getWithLoader(key interface{}, isWait bool) (interface{}, 
 func (c *SimpleCache) evict(count int) {
 	now := c.clock.Now()
 	current := 0
-	for key, item := range c.items {
+	for key, item := range c.store {
 		if current >= count {
 			return
 		}
@@ -187,9 +187,9 @@ func (c *SimpleCache) Remove(key interface{}) bool {
 }
 
 func (c *SimpleCache) remove(key interface{}) bool {
-	item, ok := c.items[key]
+	item, ok := c.store[key]
 	if ok {
-		delete(c.items, key)
+		delete(c.store, key)
 		if c.evictedFunc != nil {
 			c.evictedFunc(key, item.value)
 		}
@@ -202,9 +202,9 @@ func (c *SimpleCache) remove(key interface{}) bool {
 func (c *SimpleCache) keys() []interface{} {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	keys := make([]interface{}, len(c.items))
+	keys := make([]interface{}, len(c.store))
 	var i = 0
-	for k := range c.items {
+	for k := range c.store {
 		keys[i] = k
 		i++
 	}
@@ -235,9 +235,9 @@ func (c *SimpleCache) GetALL() map[interface{}]interface{} {
 	return m
 }
 
-// Returns the number of items in the cache.
+// Returns the number of store in the cache.
 func (c *SimpleCache) Len() int {
-	return len(c.GetALL())
+	return len(c.store)
 }
 
 // Completely clear the cache
@@ -246,7 +246,7 @@ func (c *SimpleCache) Purge() {
 	defer c.mu.Unlock()
 
 	if c.purgeVisitorFunc != nil {
-		for key, item := range c.items {
+		for key, item := range c.store {
 			c.purgeVisitorFunc(key, item.value)
 		}
 	}
