@@ -23,7 +23,7 @@ type Cache interface {
 	GetIFPresent(interface{}) (interface{}, error)
 	GetALL() map[interface{}]interface{}
 	get(interface{}, bool) (interface{}, error)
-	Remove(interface{}) bool
+	Remove(interface{}) error
 	Purge()
 	Keys() []interface{}
 	Len() int
