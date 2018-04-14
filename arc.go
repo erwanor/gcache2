@@ -212,6 +212,10 @@ func (c *ARC) remove(key interface{}) error {
 		elt.parent.Remove(elt.element)
 	}
 
+	if c.evictedFunc != nil {
+		c.evictedFunc(key, elt.value)
+	}
+
 	delete(c.store, elt.key)
 	c.size--
 	return nil
