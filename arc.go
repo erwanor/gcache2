@@ -202,13 +202,10 @@ func (c *ARC) Purge() {
 	return
 }
 
-func (c *ARC) Remove(key interface{}) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+func (c *ARC) remove(key interface{}) error {
 	elt, exists := c.store[key]
 	if !exists {
-		return false
+		return KeyNotFoundError
 	}
 
 	if elt.parent != nil {
@@ -217,7 +214,14 @@ func (c *ARC) Remove(key interface{}) bool {
 
 	delete(c.store, elt.key)
 	c.size--
-	return true
+	return nil
+}
+
+func (c *ARC) Remove(key interface{}) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.remove(key)
 }
 
 func (c *ARC) Len() int {

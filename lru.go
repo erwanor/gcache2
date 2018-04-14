@@ -190,19 +190,19 @@ func (c *LRUCache) evict(count int) {
 }
 
 // Removes the provided key from the cache.
-func (c *LRUCache) Remove(key interface{}) bool {
+func (c *LRUCache) Remove(key interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	return c.remove(key)
 }
 
-func (c *LRUCache) remove(key interface{}) bool {
+func (c *LRUCache) remove(key interface{}) error {
 	if ent, ok := c.store[key]; ok {
 		c.removeElement(ent)
-		return true
+		return nil
 	}
-	return false
+	return KeyNotFoundError
 }
 
 func (c *LRUCache) removeElement(e *list.Element) {

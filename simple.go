@@ -179,23 +179,23 @@ func (c *SimpleCache) evict(count int) {
 }
 
 // Removes the provided key from the cache.
-func (c *SimpleCache) Remove(key interface{}) bool {
+func (c *SimpleCache) Remove(key interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	return c.remove(key)
 }
 
-func (c *SimpleCache) remove(key interface{}) bool {
+func (c *SimpleCache) remove(key interface{}) error {
 	item, ok := c.store[key]
 	if ok {
 		delete(c.store, key)
 		if c.evictedFunc != nil {
 			c.evictedFunc(key, item.value)
 		}
-		return true
+		return nil
 	}
-	return false
+	return KeyNotFoundError
 }
 
 // Returns a slice of the keys in the cache.

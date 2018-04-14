@@ -227,19 +227,19 @@ func (c *LFUCache) evict(count int) {
 }
 
 // Removes the provided key from the cache.
-func (c *LFUCache) Remove(key interface{}) bool {
+func (c *LFUCache) Remove(key interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	return c.remove(key)
 }
 
-func (c *LFUCache) remove(key interface{}) bool {
+func (c *LFUCache) remove(key interface{}) error {
 	if item, ok := c.store[key]; ok {
 		c.removeItem(item)
-		return true
+		return nil
 	}
-	return false
+	return KeyNotFoundError
 }
 
 // removeElement is used to remove a given list element from the cache
