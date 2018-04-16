@@ -27,6 +27,7 @@ type Cache interface {
 	Purge()
 	Keys() []interface{}
 	Len() int
+	Debug() map[string][]int
 
 	statsAccessor
 }
