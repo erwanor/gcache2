@@ -317,3 +317,9 @@ func (it *lfuItem) IsExpired(now *time.Time) bool {
 	}
 	return it.expiration.Before(*now)
 }
+
+func (c *LFUCache) Debug() map[string][]int {
+	d := make(map[string][]int)
+	d["lfu"] = []int{len(c.store), c.freqList.Len()}
+	return d
+}
