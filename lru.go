@@ -283,3 +283,9 @@ func (it *lruItem) IsExpired(now *time.Time) bool {
 	}
 	return it.expiration.Before(*now)
 }
+
+func (c *LRUCache) Debug() map[string][]int {
+	d := make(map[string][]int)
+	d["lru"] = []int{len(c.store), c.evictList.Len()}
+	return d
+}

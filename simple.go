@@ -271,3 +271,9 @@ func (si *simpleItem) IsExpired(now *time.Time) bool {
 	}
 	return si.expiration.Before(*now)
 }
+
+func (c *SimpleCache) Debug() map[string][]int {
+	d := make(map[string][]int)
+	d["simple"] = []int{len(c.store)}
+	return d
+}

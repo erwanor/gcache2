@@ -336,3 +336,9 @@ func (e *arcItem) setMRU(l *list.List) {
 	e.parent = l
 	e.element = e.parent.PushFront(e)
 }
+
+func (c *ARC) Debug() map[string][]int {
+	d := make(map[string][]int)
+	d["arc"] = []int{len(c.store), c.split, c.t1.Len(), c.b1.Len(), c.t2.Len(), c.b2.Len()}
+	return d
+}
