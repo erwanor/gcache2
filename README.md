@@ -1,6 +1,6 @@
 # GCache2
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/aaronwinter/gcache2)](https://goreportcard.com/report/github.com/aaronwinter/gcache2)
+[![Go Report Card](https://goreportcard.com/badge/github.com/aaronwinter/gcache2)](https://goreportcard.com/report/github.com/aaronwinter/gcache2) [![Waffle.io - Columns and their card count](https://badge.waffle.io/aaronwinter/gcache2.svg?columns=all)](https://waffle.io/aaronwinter/gcache2)
 
 **Work-in-Progress**: This repository will be the home of gcache2, a caching library for Golang. Ideally the only one you will ever need. To reach that ambitious goal, I am taking some time to  scope and re-architecture gcache such that it becomes easier to add features, maintain existing ones, and get total testing coverage of the execution paths that matter. If you are interested in joining this effort, take a look at the issues! Stay tuned, friends. (:
 
