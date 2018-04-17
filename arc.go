@@ -136,6 +136,13 @@ func (c *ARC) getWithLoader(key interface{}, isWait bool) (interface{}, error) {
 	return value, nil
 }
 
+func (c *ARC) unsafeGet(key interface{}, onLoad bool) (interface{}, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.get(key, onLoad)
+}
+
 func (c *ARC) Get(key interface{}) (interface{}, error) {
 	c.mu.Lock()
 	v, err := c.get(key, false)

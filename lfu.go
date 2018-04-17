@@ -109,6 +109,13 @@ func (c *LFUCache) set(key, value interface{}) (interface{}, error) {
 	return item, nil
 }
 
+func (c *LFUCache) unsafeGet(key interface{}, onLoad bool) (interface{}, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.get(key, onLoad)
+}
+
 // Get a value from cache pool using key if it exists.
 // If it dose not exists key and has LoaderFunc,
 // generate a value using `LoaderFunc` method returns value.
