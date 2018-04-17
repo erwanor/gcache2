@@ -95,7 +95,10 @@ func (c *SimpleCache) unsafeGet(key interface{}, onLoad bool) (interface{}, erro
 // If it dose not exists key and has LoaderFunc,
 // generate a value using `LoaderFunc` method returns value.
 func (c *SimpleCache) Get(key interface{}) (interface{}, error) {
+	c.mu.Lock()
 	v, err := c.get(key, false)
+	c.mu.Unlock()
+
 	if err == KeyNotFoundError {
 		return c.getWithLoader(key, true)
 	}
@@ -106,7 +109,9 @@ func (c *SimpleCache) Get(key interface{}) (interface{}, error) {
 // If it dose not exists key, returns KeyNotFoundError.
 // And send a request which refresh value for specified key if cache object has LoaderFunc.
 func (c *SimpleCache) GetIFPresent(key interface{}) (interface{}, error) {
+	c.mu.Lock()
 	v, err := c.get(key, false)
+	c.mu.Unlock()
 	if err == KeyNotFoundError {
 		return c.getWithLoader(key, false)
 	}
@@ -114,35 +119,28 @@ func (c *SimpleCache) GetIFPresent(key interface{}) (interface{}, error) {
 }
 
 func (c *SimpleCache) get(key interface{}, onLoad bool) (interface{}, error) {
-	v, err := c.getValue(key, onLoad)
-	if err != nil {
-		return nil, err
+	item, exists := c.store[key]
+	if !exists {
+		if !onLoad {
+			c.stats.IncrMissCount()
+		}
+		return nil, KeyNotFoundError
 	}
+
+	if item.IsExpired(nil) {
+		c.remove(key)
+		return nil, KeyNotFoundError
+	}
+
+	v := item.value
+	if !onLoad {
+		c.stats.IncrHitCount()
+	}
+
 	if c.deserializeFunc != nil {
 		return c.deserializeFunc(key, v)
 	}
 	return v, nil
-}
-
-func (c *SimpleCache) getValue(key interface{}, onLoad bool) (interface{}, error) {
-	c.mu.Lock()
-	item, ok := c.store[key]
-	if ok {
-		if !item.IsExpired(nil) {
-			v := item.value
-			c.mu.Unlock()
-			if !onLoad {
-				c.stats.IncrHitCount()
-			}
-			return v, nil
-		}
-		c.remove(key)
-	}
-	c.mu.Unlock()
-	if !onLoad {
-		c.stats.IncrMissCount()
-	}
-	return nil, KeyNotFoundError
 }
 
 func (c *SimpleCache) getWithLoader(key interface{}, isWait bool) (interface{}, error) {
@@ -153,16 +151,12 @@ func (c *SimpleCache) getWithLoader(key interface{}, isWait bool) (interface{}, 
 		if e != nil {
 			return nil, e
 		}
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		item, err := c.set(key, v)
+
+		err := c.Set(key, v)
 		if err != nil {
 			return nil, err
 		}
-		if expiration != nil {
-			t := c.clock.Now().Add(*expiration)
-			item.(*simpleItem).expiration = &t
-		}
+
 		return v, nil
 	}, isWait)
 	if err != nil {
