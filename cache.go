@@ -22,7 +22,7 @@ type Cache interface {
 	Get(interface{}) (interface{}, error)
 	GetIFPresent(interface{}) (interface{}, error)
 	GetALL() map[interface{}]interface{}
-	get(interface{}, bool) (interface{}, error)
+	unsafeGet(interface{}, bool) (interface{}, error)
 	Remove(interface{}) error
 	Purge()
 	Keys() []interface{}
