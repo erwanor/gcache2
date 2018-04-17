@@ -77,6 +77,7 @@ func (c *LRUCache) set(key, value interface{}) (interface{}, error) {
 func (c *LRUCache) Set(key, value interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	_, err := c.set(key, value)
 	return err
 }
@@ -85,6 +86,7 @@ func (c *LRUCache) Set(key, value interface{}) error {
 func (c *LRUCache) SetWithExpire(key, value interface{}, expiration time.Duration) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	item, err := c.set(key, value)
 	if err != nil {
 		return err
@@ -106,7 +108,10 @@ func (c *LRUCache) unsafeGet(key interface{}, onLoad bool) (interface{}, error) 
 // If it dose not exists key and has LoaderFunc,
 // generate a value using `LoaderFunc` method returns value.
 func (c *LRUCache) Get(key interface{}) (interface{}, error) {
+	c.mu.Lock()
 	v, err := c.get(key, false)
+	c.mu.Unlock()
+
 	if err == KeyNotFoundError {
 		return c.getWithLoader(key, true)
 	}
@@ -117,7 +122,10 @@ func (c *LRUCache) Get(key interface{}) (interface{}, error) {
 // If it dose not exists key, returns KeyNotFoundError.
 // And send a request which refresh value for specified key if cache object has LoaderFunc.
 func (c *LRUCache) GetIFPresent(key interface{}) (interface{}, error) {
+	c.mu.Lock()
 	v, err := c.get(key, false)
+	c.mu.Unlock()
+
 	if err == KeyNotFoundError {
 		return c.getWithLoader(key, false)
 	}
@@ -125,57 +133,52 @@ func (c *LRUCache) GetIFPresent(key interface{}) (interface{}, error) {
 }
 
 func (c *LRUCache) get(key interface{}, onLoad bool) (interface{}, error) {
-	v, err := c.getValue(key, onLoad)
-	if err != nil {
-		return nil, err
-	}
-	if c.deserializeFunc != nil {
-		return c.deserializeFunc(key, v)
-	}
-	return v, nil
-}
+	entry, exists := c.store[key]
 
-func (c *LRUCache) getValue(key interface{}, onLoad bool) (interface{}, error) {
-	c.mu.Lock()
-	item, ok := c.store[key]
-	if ok {
-		it := item.Value.(*lruItem)
-		if !it.IsExpired(nil) {
-			c.evictList.MoveToFront(item)
-			v := it.value
-			c.mu.Unlock()
-			if !onLoad {
-				c.stats.IncrHitCount()
-			}
-			return v, nil
+	if !exists {
+		if !onLoad {
+			c.stats.IncrMissCount()
 		}
-		c.removeElement(item)
+		return nil, KeyNotFoundError
 	}
-	c.mu.Unlock()
+
+	item := entry.Value.(*lruItem)
+	if item.IsExpired(nil) {
+		c.removeElement(entry)
+		if !onLoad {
+			c.stats.IncrMissCount()
+		}
+
+		return nil, KeyNotFoundError
+	}
+
+	c.evictList.MoveToFront(entry)
 	if !onLoad {
-		c.stats.IncrMissCount()
+		c.stats.IncrHitCount()
 	}
-	return nil, KeyNotFoundError
+
+	if c.deserializeFunc != nil {
+		return c.deserializeFunc(key, item.value)
+	}
+
+	return item.value, nil
 }
 
 func (c *LRUCache) getWithLoader(key interface{}, isWait bool) (interface{}, error) {
 	if c.loaderExpireFunc == nil {
 		return nil, KeyNotFoundError
 	}
+
 	value, _, err := c.load(key, func(v interface{}, expiration *time.Duration, e error) (interface{}, error) {
 		if e != nil {
 			return nil, e
 		}
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		item, err := c.set(key, v)
+
+		err := c.Set(key, v)
 		if err != nil {
 			return nil, err
 		}
-		if expiration != nil {
-			t := c.clock.Now().Add(*expiration)
-			item.(*lruItem).expiration = &t
-		}
+
 		return v, nil
 	}, isWait)
 	if err != nil {
@@ -223,8 +226,6 @@ func (c *LRUCache) removeElement(e *list.Element) {
 }
 
 func (c *LRUCache) keys() []interface{} {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
 	keys := make([]interface{}, len(c.store))
 	var i = 0
 	for k := range c.store {
@@ -236,8 +237,12 @@ func (c *LRUCache) keys() []interface{} {
 
 // Returns a slice of the keys in the cache.
 func (c *LRUCache) Keys() []interface{} {
+	c.mu.Lock()
+	allKeys := c.keys()
+	c.mu.Unlock()
+
 	keys := []interface{}{}
-	for _, k := range c.keys() {
+	for _, k := range allKeys {
 		_, err := c.GetIFPresent(k)
 		if err == nil {
 			keys = append(keys, k)
@@ -248,8 +253,12 @@ func (c *LRUCache) Keys() []interface{} {
 
 // Returns all key-value pairs in the cache.
 func (c *LRUCache) GetALL() map[interface{}]interface{} {
+	c.mu.Lock()
+	allKeys := c.keys()
+	c.mu.Unlock()
+
 	m := make(map[interface{}]interface{})
-	for _, k := range c.keys() {
+	for _, k := range allKeys {
 		v, err := c.GetIFPresent(k)
 		if err == nil {
 			m[k] = v
