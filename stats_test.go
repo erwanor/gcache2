@@ -41,101 +41,126 @@ func TestCacheStats(t *testing.T) {
 	}{
 		{
 			builder: func() Cache {
-				cc := New(32).Simple().Build()
-				cc.Set(0, 0)
-				cc.Get(0)
-				cc.Get(1)
-				return cc
+				cache, err := New(32).Simple().Build()
+				if err != nil {
+					t.Error(err)
+				}
+
+				cache.Set(0, 0)
+				cache.Get(0)
+				cache.Get(1)
+				return cache
 			},
 			rate: 0.5,
 		},
 		{
 			builder: func() Cache {
-				cc := New(32).LRU().Build()
-				cc.Set(0, 0)
-				cc.Get(0)
-				cc.Get(1)
-				return cc
+				cache, err := New(32).LRU().Build()
+				if err != nil {
+					t.Error(err)
+				}
+				cache.Set(0, 0)
+				cache.Get(0)
+				cache.Get(1)
+				return cache
 			},
 			rate: 0.5,
 		},
 		{
 			builder: func() Cache {
-				cc := New(32).LFU().Build()
-				cc.Set(0, 0)
-				cc.Get(0)
-				cc.Get(1)
-				return cc
+				cache, err := New(32).LFU().Build()
+				if err != nil {
+					t.Error(err)
+				}
+				cache.Set(0, 0)
+				cache.Get(0)
+				cache.Get(1)
+				return cache
 			},
 			rate: 0.5,
 		},
 		{
 			builder: func() Cache {
-				cc := New(32).ARC().Build()
-				cc.Set(0, 0)
-				cc.Get(0)
-				cc.Get(1)
-				return cc
+				cache, err := New(32).ARC().Build()
+				if err != nil {
+					t.Error(err)
+				}
+				cache.Set(0, 0)
+				cache.Get(0)
+				cache.Get(1)
+				return cache
 			},
 			rate: 0.5,
 		},
 		{
 			builder: func() Cache {
-				cc := New(32).
+				cache, err := New(32).
 					Simple().
 					LoaderFunc(getter).
 					Build()
-				cc.Set(0, 0)
-				cc.Get(0)
-				cc.Get(1)
-				return cc
+				if err != nil {
+					t.Error(err)
+				}
+				cache.Set(0, 0)
+				cache.Get(0)
+				cache.Get(1)
+				return cache
 			},
 			rate: 0.5,
 		},
 		{
 			builder: func() Cache {
-				cc := New(32).
+				cache, err := New(32).
 					LRU().
 					LoaderFunc(getter).
 					Build()
-				cc.Set(0, 0)
-				cc.Get(0)
-				cc.Get(1)
-				return cc
+				if err != nil {
+					t.Error(err)
+				}
+				cache.Set(0, 0)
+				cache.Get(0)
+				cache.Get(1)
+				return cache
 			},
 			rate: 0.5,
 		},
 		{
 			builder: func() Cache {
-				cc := New(32).
+				cache, err := New(32).
 					LFU().
 					LoaderFunc(getter).
 					Build()
-				cc.Set(0, 0)
-				cc.Get(0)
-				cc.Get(1)
-				return cc
+				if err != nil {
+					t.Error(err)
+				}
+				cache.Set(0, 0)
+				cache.Get(0)
+				cache.Get(1)
+				return cache
 			},
 			rate: 0.5,
 		},
 		{
 			builder: func() Cache {
-				cc := New(32).
+				cache, err := New(32).
 					ARC().
 					LoaderFunc(getter).
 					Build()
-				cc.Set(0, 0)
-				cc.Get(0)
-				cc.Get(1)
-				return cc
+				if err != nil {
+					t.Error(err)
+				}
+				cache.Set(0, 0)
+				cache.Get(0)
+				cache.Get(1)
+				return cache
 			},
 			rate: 0.5,
 		},
 	}
 
 	for i, cs := range cases {
-		cc := cs.builder()
-		if rate := cc.HitRate(); rate != cs.rate {
+		cache := cs.builder()
+		if rate := cache.HitRate(); rate != cs.rate {
 			t.Errorf("case-%v: %v != %v", i, rate, cs.rate)
 		}
 	}

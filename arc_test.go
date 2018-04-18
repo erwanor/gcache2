@@ -5,14 +5,14 @@ import (
 	"testing"
 )
 
-func buildARCache(size int) Cache {
+func buildARCache(size int) (Cache, error) {
 	return New(size).
 		ARC().
 		EvictedFunc(evictedFuncForARC).
 		Build()
 }
 
-func buildLoadingARCache(size int) Cache {
+func buildLoadingARCache(size int) (Cache, error) {
 	return New(size).
 		ARC().
 		LoaderFunc(loader).
@@ -26,7 +26,11 @@ func evictedFuncForARC(key, value interface{}) {
 
 func TestARCGet(t *testing.T) {
 	size := 1000
-	gc := buildARCache(size)
+	gc, err := buildARCache(size)
+	if err != nil {
+		t.Error(err)
+	}
+
 	testSetCache(t, gc, size)
 	testGetCache(t, gc, size)
 }
@@ -34,5 +38,9 @@ func TestARCGet(t *testing.T) {
 func TestLoadingARCGet(t *testing.T) {
 	size := 1000
 	numbers := 1000
-	testGetCache(t, buildLoadingARCache(size), numbers)
+	gc, err := buildLoadingARCache(size)
+	if err != nil {
+		t.Error(err)
+	}
+	testGetCache(t, gc, numbers)
 }

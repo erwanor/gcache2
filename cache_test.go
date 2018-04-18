@@ -20,7 +20,7 @@ func TestLoaderFunc(t *testing.T) {
 	for _, builder := range testCaches {
 		var testCounter int64
 		counter := 1000
-		cache := builder.
+		cache, err := builder.
 			LoaderFunc(func(key interface{}) (interface{}, error) {
 				time.Sleep(10 * time.Millisecond)
 				return atomic.AddInt64(&testCounter, 1), nil
@@ -28,6 +28,10 @@ func TestLoaderFunc(t *testing.T) {
 			EvictedFunc(func(key, value interface{}) {
 				panic(key)
 			}).Build()
+
+		if err != nil {
+			t.Error(err)
+		}
 
 		var wg sync.WaitGroup
 		for i := 0; i < counter; i++ {
@@ -59,13 +63,16 @@ func TestLoaderExpireFuncWithoutExpire(t *testing.T) {
 	for _, builder := range testCaches {
 		var testCounter int64
 		counter := 1000
-		cache := builder.
+		cache, err := builder.
 			LoaderExpireFunc(func(key interface{}) (interface{}, *time.Duration, error) {
 				return atomic.AddInt64(&testCounter, 1), nil, nil
 			}).
 			EvictedFunc(func(key, value interface{}) {
 				panic(key)
 			}).Build()
+		if err != nil {
+			t.Error(err)
+		}
 
 		var wg sync.WaitGroup
 		for i := 0; i < counter; i++ {
@@ -114,7 +121,7 @@ func TestLoaderPurgeVisitorFunc(t *testing.T) {
 	for _, test := range tests {
 		var purgeCounter, evictCounter, loaderCounter int64
 		counter := 1000
-		cache := test.cacheBuilder.
+		cache, err := test.cacheBuilder.
 			LoaderFunc(func(key interface{}) (interface{}, error) {
 				return atomic.AddInt64(&loaderCounter, 1), nil
 			}).
@@ -125,6 +132,9 @@ func TestLoaderPurgeVisitorFunc(t *testing.T) {
 				atomic.AddInt64(&purgeCounter, 1)
 			}).
 			Build()
+		if err != nil {
+			t.Error(err)
+		}
 
 		var wg sync.WaitGroup
 		for i := 0; i < counter; i++ {
@@ -169,7 +179,7 @@ func TestDeserializeFunc(t *testing.T) {
 	for _, cs := range cases {
 		key1, value1 := "key1", "value1"
 		key2, value2 := "key2", "value2"
-		cc := New(32).
+		cache, err := New(32).
 			EvictType(cs.tp).
 			LoaderFunc(func(k interface{}) (interface{}, error) {
 				return value1, nil
@@ -190,24 +200,28 @@ func TestDeserializeFunc(t *testing.T) {
 				return buf.Bytes(), err
 			}).
 			Build()
-		v, err := cc.Get(key1)
 		if err != nil {
-			t.Fatal(err)
-		}
-		if v != value1 {
-			t.Errorf("%v != %v", v, value1)
-		}
-		v, err = cc.Get(key1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if v != value1 {
-			t.Errorf("%v != %v", v, value1)
-		}
-		if err := cc.Set(key2, value2); err != nil {
 			t.Error(err)
 		}
-		v, err = cc.Get(key2)
+
+		v, err := cache.Get(key1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v != value1 {
+			t.Errorf("%v != %v", v, value1)
+		}
+		v, err = cache.Get(key1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v != value1 {
+			t.Errorf("%v != %v", v, value1)
+		}
+		if err := cache.Set(key2, value2); err != nil {
+			t.Error(err)
+		}
+		v, err = cache.Get(key2)
 		if err != nil {
 			t.Error(err)
 		}
