@@ -153,26 +153,26 @@ func (cb *CacheBuilder) Expiration(expiration time.Duration) *CacheBuilder {
 	return cb
 }
 
-func (cb *CacheBuilder) Build() Cache {
+func (cb *CacheBuilder) Build() (Cache, error) {
 	if cb.capacity <= 0 && cb.tp != TYPE_SIMPLE {
-		panic("gcache: Cache capacity <= 0")
+		return nil, fmt.Errorf("gcache2: can't Build Cache, invalid Cache capacity (%v<=0)", cb.capacity)
 	}
 
 	return cb.build()
 }
 
-func (cb *CacheBuilder) build() Cache {
+func (cb *CacheBuilder) build() (Cache, error) {
 	switch cb.tp {
 	case TYPE_SIMPLE:
-		return newSimpleCache(cb)
+		return newSimpleCache(cb), nil
 	case TYPE_LRU:
-		return newLRUCache(cb)
+		return newLRUCache(cb), nil
 	case TYPE_LFU:
-		return newLFUCache(cb)
+		return newLFUCache(cb), nil
 	case TYPE_ARC:
-		return newARC(cb)
+		return newARC(cb), nil
 	default:
-		panic("gcache: Unknown type " + cb.tp)
+		return nil, fmt.Errorf("gcache2: can't build Cache, unknow Cache type (%s", cb.tp)
 	}
 }
 
