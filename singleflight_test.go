@@ -27,7 +27,13 @@ import (
 
 func TestDo(t *testing.T) {
 	var g Group
-	g.cache = New(32).Build()
+	gc, err := New(32).Build()
+	if err != nil {
+		t.Error(err)
+	}
+
+	g.cache = gc
+
 	v, _, err := g.Do("key", func() (interface{}, error) {
 		return "bar", nil
 	}, true)
@@ -41,7 +47,12 @@ func TestDo(t *testing.T) {
 
 func TestDoErr(t *testing.T) {
 	var g Group
-	g.cache = New(32).Build()
+	gc, err := New(32).Build()
+	if err != nil {
+		t.Error(err)
+	}
+	g.cache = gc
+
 	someErr := errors.New("Some error")
 	v, _, err := g.Do("key", func() (interface{}, error) {
 		return nil, someErr
@@ -56,7 +67,12 @@ func TestDoErr(t *testing.T) {
 
 func TestDoDupSuppress(t *testing.T) {
 	var g Group
-	g.cache = New(32).Build()
+	gc, err := New(32).Build()
+	if err != nil {
+		t.Error(err)
+	}
+	g.cache = gc
+
 	c := make(chan string)
 	var calls int32
 	fn := func() (interface{}, error) {
