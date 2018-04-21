@@ -8,6 +8,12 @@ type SimpleCache struct {
 	store map[interface{}]*simpleItem
 }
 
+type simpleItem struct {
+	clock      Clock
+	value      interface{}
+	expiration *time.Time
+}
+
 func newSimpleCache(cb *CacheBuilder) *SimpleCache {
 	c := &SimpleCache{}
 	buildCache(&c.baseCache, cb)
@@ -23,6 +29,43 @@ func (c *SimpleCache) init() {
 	} else {
 		c.store = make(map[interface{}]*simpleItem, c.size)
 	}
+}
+
+func (c *SimpleCache) set(key, value interface{}) (interface{}, error) {
+	var err error
+	if c.serializeFunc != nil {
+		value, err = c.serializeFunc(key, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if c.addedFunc != nil {
+		defer c.addedFunc(key, value)
+	}
+
+	entry, exists := c.store[key]
+	if !exists {
+		// for TYPE_SIMPLE, when capacity < 0 we do not bound the cache capacity
+		if len(c.store) >= c.capacity && c.capacity > 0 {
+			c.evict(1)
+		}
+
+		entry = &simpleItem{
+			clock: c.clock,
+			value: value,
+		}
+		c.store[key] = entry
+	}
+
+	entry.value = value
+
+	if c.expiration != nil {
+		t := c.clock.Now().Add(*c.expiration)
+		entry.expiration = &t
+	}
+
+	return entry, nil
 }
 
 // Set a new key-value pair
@@ -45,50 +88,6 @@ func (c *SimpleCache) SetWithExpire(key, value interface{}, expiration time.Dura
 	t := c.clock.Now().Add(expiration)
 	item.(*simpleItem).expiration = &t
 	return nil
-}
-
-func (c *SimpleCache) set(key, value interface{}) (interface{}, error) {
-	var err error
-	if c.serializeFunc != nil {
-		value, err = c.serializeFunc(key, value)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// Check for existing item
-	item, ok := c.store[key]
-	if ok {
-		item.value = value
-	} else {
-		// Verify size not exceeded
-		if (len(c.store) >= c.size) && c.size > 0 {
-			c.evict(1)
-		}
-		item = &simpleItem{
-			clock: c.clock,
-			value: value,
-		}
-		c.store[key] = item
-	}
-
-	if c.expiration != nil {
-		t := c.clock.Now().Add(*c.expiration)
-		item.expiration = &t
-	}
-
-	if c.addedFunc != nil {
-		c.addedFunc(key, value)
-	}
-
-	return item, nil
-}
-
-func (c *SimpleCache) unsafeGet(key interface{}, onLoad bool) (interface{}, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.get(key, onLoad)
 }
 
 // Get a value from cache pool using key if it exists.
@@ -255,12 +254,6 @@ func (c *SimpleCache) Purge() {
 	c.init()
 }
 
-type simpleItem struct {
-	clock      Clock
-	value      interface{}
-	expiration *time.Time
-}
-
 // returns boolean value whether this item is expired or not.
 func (si *simpleItem) IsExpired(now *time.Time) bool {
 	if si.expiration == nil {
@@ -277,4 +270,11 @@ func (c *SimpleCache) Debug() map[string][]int {
 	d := make(map[string][]int)
 	d["simple"] = []int{len(c.store)}
 	return d
+}
+
+func (c *SimpleCache) unsafeGet(key interface{}, onLoad bool) (interface{}, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.get(key, onLoad)
 }
