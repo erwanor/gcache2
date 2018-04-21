@@ -14,38 +14,21 @@ const (
 	TYPE_ARC    = "arc"
 )
 
-var KeyNotFoundError = errors.New("Key not found.")
-
 type Cache interface {
 	Set(interface{}, interface{}) error
 	SetWithExpire(interface{}, interface{}, time.Duration) error
 	Get(interface{}) (interface{}, error)
 	GetIFPresent(interface{}) (interface{}, error)
 	GetALL() map[interface{}]interface{}
-	unsafeGet(interface{}, bool) (interface{}, error)
 	Remove(interface{}) error
 	Purge()
 	Keys() []interface{}
 	Len() int
+
 	Debug() map[string][]int
+	unsafeGet(interface{}, bool) (interface{}, error)
 
 	statsAccessor
-}
-
-type baseCache struct {
-	clock            Clock
-	capacity         int
-	size             int
-	loaderExpireFunc LoaderExpireFunc
-	evictedFunc      EvictedFunc
-	purgeVisitorFunc PurgeVisitorFunc
-	addedFunc        AddedFunc
-	deserializeFunc  DeserializeFunc
-	serializeFunc    SerializeFunc
-	expiration       *time.Duration
-	mu               sync.RWMutex
-	loadGroup        Group
-	*stats
 }
 
 type (
@@ -58,30 +41,48 @@ type (
 	SerializeFunc    func(interface{}, interface{}) (interface{}, error)
 )
 
-type CacheBuilder struct {
-	clock            Clock
-	tp               string
-	capacity         int
+type baseCache struct {
+	capacity int
+	size     int
+
 	loaderExpireFunc LoaderExpireFunc
 	evictedFunc      EvictedFunc
 	purgeVisitorFunc PurgeVisitorFunc
 	addedFunc        AddedFunc
-	expiration       *time.Duration
 	deserializeFunc  DeserializeFunc
 	serializeFunc    SerializeFunc
+
+	expiration *time.Duration
+	clock      Clock
+
+	*stats
+	mu        sync.RWMutex
+	loadGroup Group
 }
+
+type CacheBuilder struct {
+	tp       string
+	capacity int
+
+	loaderExpireFunc LoaderExpireFunc
+	evictedFunc      EvictedFunc
+	purgeVisitorFunc PurgeVisitorFunc
+	addedFunc        AddedFunc
+	deserializeFunc  DeserializeFunc
+	serializeFunc    SerializeFunc
+
+	expiration *time.Duration
+	clock      Clock
+}
+
+var KeyNotFoundError = errors.New("Key not found.")
 
 func New(capacity int) *CacheBuilder {
 	return &CacheBuilder{
-		clock:    NewRealClock(),
 		tp:       TYPE_SIMPLE,
 		capacity: capacity,
+		clock:    NewRealClock(),
 	}
-}
-
-func (cb *CacheBuilder) Clock(clock Clock) *CacheBuilder {
-	cb.clock = clock
-	return cb
 }
 
 // Set a loader function.
@@ -91,14 +92,6 @@ func (cb *CacheBuilder) LoaderFunc(loaderFunc LoaderFunc) *CacheBuilder {
 		v, err := loaderFunc(k)
 		return v, nil, err
 	}
-	return cb
-}
-
-// Set a loader function with expiration.
-// loaderExpireFunc: create a new value with this function if cached value is expired.
-// If nil returned instead of time.Duration from loaderExpireFunc than value will never expire.
-func (cb *CacheBuilder) LoaderExpireFunc(loaderExpireFunc LoaderExpireFunc) *CacheBuilder {
-	cb.loaderExpireFunc = loaderExpireFunc
 	return cb
 }
 
@@ -123,6 +116,14 @@ func (cb *CacheBuilder) ARC() *CacheBuilder {
 	return cb.EvictType(TYPE_ARC)
 }
 
+// Set a loader function with expiration.
+// loaderExpireFunc: create a new value with this function if cached value is expired.
+// If nil returned instead of time.Duration from loaderExpireFunc than value will never expire.
+func (cb *CacheBuilder) LoaderExpireFunc(loaderExpireFunc LoaderExpireFunc) *CacheBuilder {
+	cb.loaderExpireFunc = loaderExpireFunc
+	return cb
+}
+
 func (cb *CacheBuilder) EvictedFunc(evictedFunc EvictedFunc) *CacheBuilder {
 	cb.evictedFunc = evictedFunc
 	return cb
@@ -145,6 +146,11 @@ func (cb *CacheBuilder) DeserializeFunc(deserializeFunc DeserializeFunc) *CacheB
 
 func (cb *CacheBuilder) SerializeFunc(serializeFunc SerializeFunc) *CacheBuilder {
 	cb.serializeFunc = serializeFunc
+	return cb
+}
+
+func (cb *CacheBuilder) Clock(clock Clock) *CacheBuilder {
+	cb.clock = clock
 	return cb
 }
 
