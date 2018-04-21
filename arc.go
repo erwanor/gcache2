@@ -6,14 +6,6 @@ import (
 	"time"
 )
 
-type arcItem struct {
-	key     interface{}
-	value   interface{}
-	parent  *list.List
-	element *list.Element
-	ghost   bool
-}
-
 // Constantly balances between LRU and LFU, to improve the combined result.
 type ARC struct {
 	baseCache
@@ -30,6 +22,14 @@ type ARC struct {
 	//      recency or frequency, depending on the workload.
 	//	It's sometime referred as the "learning parameter" of the cache.
 	split int
+}
+
+type arcItem struct {
+	key     interface{}
+	value   interface{}
+	parent  *list.List
+	element *list.Element
+	ghost   bool
 }
 
 func newARC(cb *CacheBuilder) *ARC {
@@ -136,13 +136,6 @@ func (c *ARC) getWithLoader(key interface{}, isWait bool) (interface{}, error) {
 	return value, nil
 }
 
-func (c *ARC) unsafeGet(key interface{}, onLoad bool) (interface{}, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.get(key, onLoad)
-}
-
 func (c *ARC) Get(key interface{}) (interface{}, error) {
 	c.mu.Lock()
 	v, err := c.get(key, false)
@@ -193,22 +186,6 @@ func (c *ARC) GetALL() map[interface{}]interface{} {
 	return storeActual
 }
 
-func (c *ARC) Keys() []interface{} {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	cached := c.cached()
-	keys := make([]interface{}, 0)
-
-	for _, elt := range cached {
-		keys = append(keys, elt.(*arcItem).key)
-	}
-	return keys
-}
-
-func (c *ARC) Purge() {
-	return
-}
-
 func (c *ARC) remove(key interface{}) error {
 	elt, exists := c.store[key]
 	if !exists {
@@ -235,8 +212,35 @@ func (c *ARC) Remove(key interface{}) error {
 	return c.remove(key)
 }
 
+func (c *ARC) Purge() {
+	return
+}
+
+func (c *ARC) Keys() []interface{} {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cached := c.cached()
+	keys := make([]interface{}, 0)
+
+	for _, elt := range cached {
+		keys = append(keys, elt.(*arcItem).key)
+	}
+	return keys
+}
+
 func (c *ARC) Len() int {
 	return c.size
+}
+
+func (c *ARC) removeLRU(l *list.List) {
+	lru := l.Back()
+	if c.evictedFunc != nil {
+		defer c.evictedFunc(lru.Value.(*arcItem).key, lru.Value.(*arcItem).value)
+	}
+
+	l.Remove(lru)
+	delete(c.store, lru.Value.(*arcItem).key)
+	c.size--
 }
 
 func (c *ARC) request(e *arcItem) error {
@@ -303,15 +307,13 @@ func (c *ARC) request(e *arcItem) error {
 	return nil
 }
 
-func (c *ARC) removeLRU(l *list.List) {
-	lru := l.Back()
-	if c.evictedFunc != nil {
-		defer c.evictedFunc(lru.Value.(*arcItem).key, lru.Value.(*arcItem).value)
+func (e *arcItem) setMRU(l *list.List) {
+	if e.parent != nil {
+		e.parent.Remove(e.element)
 	}
 
-	l.Remove(lru)
-	delete(c.store, lru.Value.(*arcItem).key)
-	c.size--
+	e.parent = l
+	e.element = e.parent.PushFront(e)
 }
 
 func (c *ARC) replace(e *arcItem) {
@@ -335,17 +337,15 @@ func (c *ARC) replace(e *arcItem) {
 	c.size--
 }
 
-func (e *arcItem) setMRU(l *list.List) {
-	if e.parent != nil {
-		e.parent.Remove(e.element)
-	}
-
-	e.parent = l
-	e.element = e.parent.PushFront(e)
-}
-
 func (c *ARC) Debug() map[string][]int {
 	d := make(map[string][]int)
 	d["arc"] = []int{len(c.store), c.split, c.t1.Len(), c.b1.Len(), c.t2.Len(), c.b2.Len()}
 	return d
+}
+
+func (c *ARC) unsafeGet(key interface{}, onLoad bool) (interface{}, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.get(key, onLoad)
 }
