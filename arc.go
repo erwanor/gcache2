@@ -32,15 +32,19 @@ type arcItem struct {
 	ghost   bool
 }
 
-func newARC(cb *CacheBuilder) *ARC {
-	c := &ARC{}
-	buildCache(&c.baseCache, cb)
+func (c *ARC) init() {
 	c.store = make(map[interface{}]*arcItem, c.capacity)
 	c.t1 = list.New()
 	c.t2 = list.New()
 	c.b1 = list.New()
 	c.b2 = list.New()
+}
+
+func newARC(cb *CacheBuilder) *ARC {
+	c := &ARC{}
+	buildCache(&c.baseCache, cb)
 	c.loadGroup.cache = c
+	c.init()
 	return c
 }
 
@@ -213,7 +217,23 @@ func (c *ARC) Remove(key interface{}) error {
 }
 
 func (c *ARC) Purge() {
-	return
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.purgeVisitorFunc != nil {
+		for elt := c.t1.Front(); elt != nil; elt = elt.Next() {
+			entry := elt.Value.(*arcItem)
+			c.purgeVisitorFunc(entry.key, entry.value)
+		}
+
+		for elt := c.t2.Front(); elt != nil; elt = elt.Next() {
+			entry := elt.Value.(*arcItem)
+			c.purgeVisitorFunc(entry.key, entry.value)
+		}
+	}
+
+	c.init()
+
 }
 
 func (c *ARC) Keys() []interface{} {
