@@ -2,7 +2,6 @@ package gcache
 
 import "time"
 
-// SimpleCache has no clear priority for evict cache. It depends on key-value map order.
 type SimpleCache struct {
 	baseCache
 	store map[interface{}]*simpleItem
@@ -68,7 +67,6 @@ func (c *SimpleCache) set(key, value interface{}) (interface{}, error) {
 	return entry, nil
 }
 
-// Set a new key-value pair
 func (c *SimpleCache) Set(key, value interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -76,7 +74,6 @@ func (c *SimpleCache) Set(key, value interface{}) error {
 	return err
 }
 
-// Set a new key-value pair with an expiration time
 func (c *SimpleCache) SetWithExpire(key, value interface{}, expiration time.Duration) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -90,9 +87,6 @@ func (c *SimpleCache) SetWithExpire(key, value interface{}, expiration time.Dura
 	return nil
 }
 
-// Get a value from cache pool using key if it exists.
-// If it dose not exists key and has LoaderFunc,
-// generate a value using `LoaderFunc` method returns value.
 func (c *SimpleCache) Get(key interface{}) (interface{}, error) {
 	c.mu.Lock()
 	v, err := c.get(key, false)
@@ -104,9 +98,6 @@ func (c *SimpleCache) Get(key interface{}) (interface{}, error) {
 	return v, err
 }
 
-// Get a value from cache pool using key if it exists.
-// If it dose not exists key, returns KeyNotFoundError.
-// And send a request which refresh value for specified key if cache object has LoaderFunc.
 func (c *SimpleCache) GetIFPresent(key interface{}) (interface{}, error) {
 	c.mu.Lock()
 	v, err := c.get(key, false)
@@ -178,7 +169,6 @@ func (c *SimpleCache) evict(count int) {
 	}
 }
 
-// Removes the provided key from the cache.
 func (c *SimpleCache) Remove(key interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -198,7 +188,6 @@ func (c *SimpleCache) remove(key interface{}) error {
 	return KeyNotFoundError
 }
 
-// Returns a slice of the keys in the cache.
 func (c *SimpleCache) keys() []interface{} {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -211,7 +200,6 @@ func (c *SimpleCache) keys() []interface{} {
 	return keys
 }
 
-// Returns a slice of the keys in the cache.
 func (c *SimpleCache) Keys() []interface{} {
 	keys := []interface{}{}
 	for _, k := range c.keys() {
@@ -223,7 +211,6 @@ func (c *SimpleCache) Keys() []interface{} {
 	return keys
 }
 
-// Returns all key-value pairs in the cache.
 func (c *SimpleCache) GetALL() map[interface{}]interface{} {
 	m := make(map[interface{}]interface{})
 	for _, k := range c.keys() {
@@ -235,12 +222,10 @@ func (c *SimpleCache) GetALL() map[interface{}]interface{} {
 	return m
 }
 
-// Returns the number of store in the cache.
 func (c *SimpleCache) Len() int {
 	return len(c.store)
 }
 
-// Completely clear the cache
 func (c *SimpleCache) Purge() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -254,7 +239,6 @@ func (c *SimpleCache) Purge() {
 	c.init()
 }
 
-// returns boolean value whether this item is expired or not.
 func (si *simpleItem) IsExpired(now *time.Time) bool {
 	if si.expiration == nil {
 		return false

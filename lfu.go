@@ -5,11 +5,10 @@ import (
 	"time"
 )
 
-// Discards the least frequently used store first.
 type LFUCache struct {
 	baseCache
 	store    map[interface{}]*lfuItem
-	freqList *list.List // list for freqEntry
+	freqList *list.List
 }
 
 type freqEntry struct {
@@ -97,7 +96,6 @@ func (c *LFUCache) Set(key, value interface{}) error {
 	return err
 }
 
-// Set a new key-value pair with an expiration time
 func (c *LFUCache) SetWithExpire(key, value interface{}, expiration time.Duration) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -163,9 +161,6 @@ func (c *LFUCache) getWithLoader(key interface{}, isWait bool) (interface{}, err
 	return value, nil
 }
 
-// Get a value from cache pool using key if it exists.
-// If it dose not exists key and has LoaderFunc,
-// generate a value using `LoaderFunc` method returns value.
 func (c *LFUCache) Get(key interface{}) (interface{}, error) {
 	c.mu.Lock()
 	v, err := c.get(key, false)
@@ -177,9 +172,6 @@ func (c *LFUCache) Get(key interface{}) (interface{}, error) {
 	return v, err
 }
 
-// Get a value from cache pool using key if it exists.
-// If it dose not exists key, returns KeyNotFoundError.
-// And send a request which refresh value for specified key if cache object has LoaderFunc.
 func (c *LFUCache) GetIFPresent(key interface{}) (interface{}, error) {
 	c.mu.Lock()
 	v, err := c.get(key, false)
@@ -191,7 +183,6 @@ func (c *LFUCache) GetIFPresent(key interface{}) (interface{}, error) {
 	return v, err
 }
 
-// Returns all key-value pairs in the cache.
 func (c *LFUCache) GetALL() map[interface{}]interface{} {
 	c.mu.Lock()
 	allKeys := c.keys()
@@ -215,7 +206,6 @@ func (c *LFUCache) remove(key interface{}) error {
 	return KeyNotFoundError
 }
 
-// Removes the provided key from the cache.
 func (c *LFUCache) Remove(key interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -223,7 +213,6 @@ func (c *LFUCache) Remove(key interface{}) error {
 	return c.remove(key)
 }
 
-// Completely clear the cache
 func (c *LFUCache) Purge() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -247,7 +236,6 @@ func (c *LFUCache) keys() []interface{} {
 	return keys
 }
 
-// Returns a slice of the keys in the cache.
 func (c *LFUCache) Keys() []interface{} {
 	c.mu.Lock()
 	allKeys := c.keys()
@@ -263,7 +251,6 @@ func (c *LFUCache) Keys() []interface{} {
 	return keys
 }
 
-// Returns the number of store in the cache.
 func (c *LFUCache) Len() int {
 	return len(c.store)
 }
@@ -285,7 +272,6 @@ func (c *LFUCache) increment(item *lfuItem) {
 	item.freqElement = nextFreqElement
 }
 
-// evict removes the item with smallest frequency from the cache.
 func (c *LFUCache) evict(count int) {
 	entry := c.freqList.Front()
 	for i := 0; i < count; {
@@ -304,7 +290,6 @@ func (c *LFUCache) evict(count int) {
 	}
 }
 
-// removeElement is used to remove a given list element from the cache
 func (c *LFUCache) removeItem(item *lfuItem) {
 	delete(c.store, item.key)
 	delete(item.freqElement.Value.(*freqEntry).items, item)
@@ -313,7 +298,6 @@ func (c *LFUCache) removeItem(item *lfuItem) {
 	}
 }
 
-// returns boolean value whether this item is expired or not.
 func (it *lfuItem) isExpired(now *time.Time) bool {
 	if it.expiration == nil {
 		return false
