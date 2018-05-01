@@ -232,6 +232,18 @@ func (c *SimpleCache) Len() int {
 	return len(c.store)
 }
 
+func (c *SimpleCache) Refresh() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	allKeys := c.keys()
+	for _, k := range allKeys {
+		c.get(k, true)
+	}
+
+	return nil
+}
+
 func (c *SimpleCache) evict(count int) {
 	now := c.clock.Now()
 	current := 0
