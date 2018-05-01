@@ -87,27 +87,6 @@ func (c *SimpleCache) SetWithExpire(key, value interface{}, expiration time.Dura
 	return nil
 }
 
-func (c *SimpleCache) Get(key interface{}) (interface{}, error) {
-	c.mu.Lock()
-	v, err := c.get(key, false)
-	c.mu.Unlock()
-
-	if err == KeyNotFoundError {
-		return c.getWithLoader(key, true)
-	}
-	return v, err
-}
-
-func (c *SimpleCache) GetIFPresent(key interface{}) (interface{}, error) {
-	c.mu.Lock()
-	v, err := c.get(key, false)
-	c.mu.Unlock()
-	if err == KeyNotFoundError {
-		return c.getWithLoader(key, false)
-	}
-	return v, nil
-}
-
 func (c *SimpleCache) get(key interface{}, onLoad bool) (interface{}, error) {
 	item, exists := c.store[key]
 	if !exists {
@@ -117,7 +96,7 @@ func (c *SimpleCache) get(key interface{}, onLoad bool) (interface{}, error) {
 		return nil, KeyNotFoundError
 	}
 
-	if item.IsExpired(nil) {
+	if item.isExpired(nil) {
 		c.remove(key)
 		return nil, KeyNotFoundError
 	}
@@ -155,6 +134,37 @@ func (c *SimpleCache) getWithLoader(key interface{}, isWait bool) (interface{}, 
 	return value, nil
 }
 
+func (c *SimpleCache) Get(key interface{}) (interface{}, error) {
+	c.mu.Lock()
+	v, err := c.get(key, false)
+	c.mu.Unlock()
+
+	if err == KeyNotFoundError {
+		return c.getWithLoader(key, true)
+	}
+	return v, err
+}
+
+func (c *SimpleCache) GetIFPresent(key interface{}) (interface{}, error) {
+	c.mu.Lock()
+	v, err := c.get(key, false)
+	c.mu.Unlock()
+	if err == KeyNotFoundError {
+		return c.getWithLoader(key, false)
+	}
+	return v, nil
+}
+
+func (c *SimpleCache) GetALL() map[interface{}]interface{} {
+	m := make(map[interface{}]interface{})
+	for _, k := range c.keys() {
+		v, err := c.GetIFPresent(k)
+		if err == nil {
+			m[k] = v
+		}
+	}
+	return m
+}
 func (c *SimpleCache) evict(count int) {
 	now := c.clock.Now()
 	current := 0
@@ -169,13 +179,6 @@ func (c *SimpleCache) evict(count int) {
 	}
 }
 
-func (c *SimpleCache) Remove(key interface{}) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	return c.remove(key)
-}
-
 func (c *SimpleCache) remove(key interface{}) error {
 	item, ok := c.store[key]
 	if ok {
@@ -186,6 +189,26 @@ func (c *SimpleCache) remove(key interface{}) error {
 		return nil
 	}
 	return KeyNotFoundError
+}
+
+func (c *SimpleCache) Remove(key interface{}) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.remove(key)
+}
+
+func (c *SimpleCache) Purge() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.purgeVisitorFunc != nil {
+		for key, item := range c.store {
+			c.purgeVisitorFunc(key, item.value)
+		}
+	}
+
+	c.init()
 }
 
 func (c *SimpleCache) keys() []interface{} {
@@ -211,35 +234,11 @@ func (c *SimpleCache) Keys() []interface{} {
 	return keys
 }
 
-func (c *SimpleCache) GetALL() map[interface{}]interface{} {
-	m := make(map[interface{}]interface{})
-	for _, k := range c.keys() {
-		v, err := c.GetIFPresent(k)
-		if err == nil {
-			m[k] = v
-		}
-	}
-	return m
-}
-
 func (c *SimpleCache) Len() int {
 	return len(c.store)
 }
 
-func (c *SimpleCache) Purge() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.purgeVisitorFunc != nil {
-		for key, item := range c.store {
-			c.purgeVisitorFunc(key, item.value)
-		}
-	}
-
-	c.init()
-}
-
-func (si *simpleItem) IsExpired(now *time.Time) bool {
+func (si *simpleItem) isExpired(now *time.Time) bool {
 	if si.expiration == nil {
 		return false
 	}
