@@ -24,6 +24,7 @@ type Cache interface {
 	Purge()
 	Keys() []interface{}
 	Len() int
+	Refresh() error
 
 	Debug() map[string][]int
 	unsafeGet(interface{}, bool) (interface{}, error)
