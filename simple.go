@@ -152,31 +152,22 @@ func (c *SimpleCache) GetIFPresent(key interface{}) (interface{}, error) {
 	if err == KeyNotFoundError {
 		return c.getWithLoader(key, false)
 	}
-	return v, nil
+	return v, err
 }
 
 func (c *SimpleCache) GetALL() map[interface{}]interface{} {
+	c.mu.Lock()
+	allKeys := c.keys()
+	c.mu.Unlock()
+
 	m := make(map[interface{}]interface{})
-	for _, k := range c.keys() {
+	for _, k := range allKeys {
 		v, err := c.GetIFPresent(k)
 		if err == nil {
 			m[k] = v
 		}
 	}
 	return m
-}
-func (c *SimpleCache) evict(count int) {
-	now := c.clock.Now()
-	current := 0
-	for key, item := range c.store {
-		if current >= count {
-			return
-		}
-		if item.expiration == nil || now.After(*item.expiration) {
-			defer c.remove(key)
-			current++
-		}
-	}
 }
 
 func (c *SimpleCache) remove(key interface{}) error {
@@ -212,10 +203,8 @@ func (c *SimpleCache) Purge() {
 }
 
 func (c *SimpleCache) keys() []interface{} {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
 	keys := make([]interface{}, len(c.store))
-	var i = 0
+	i := 0
 	for k := range c.store {
 		keys[i] = k
 		i++
@@ -224,8 +213,13 @@ func (c *SimpleCache) keys() []interface{} {
 }
 
 func (c *SimpleCache) Keys() []interface{} {
+	c.mu.Lock()
+	allKeys := c.keys()
+	c.mu.Unlock()
+
 	keys := []interface{}{}
-	for _, k := range c.keys() {
+
+	for _, k := range allKeys {
 		_, err := c.GetIFPresent(k)
 		if err == nil {
 			keys = append(keys, k)
@@ -236,6 +230,20 @@ func (c *SimpleCache) Keys() []interface{} {
 
 func (c *SimpleCache) Len() int {
 	return len(c.store)
+}
+
+func (c *SimpleCache) evict(count int) {
+	now := c.clock.Now()
+	current := 0
+	for key, item := range c.store {
+		if current >= count {
+			return
+		}
+		if item.expiration == nil || now.After(*item.expiration) {
+			defer c.remove(key)
+			current++
+		}
+	}
 }
 
 func (si *simpleItem) isExpired(now *time.Time) bool {
